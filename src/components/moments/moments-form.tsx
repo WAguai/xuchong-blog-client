@@ -33,24 +33,24 @@ export function MomentsForm() {
     setImages(images.filter((_, i) => i !== index))
   }
 
-const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-    try {
-      const response = await HttpService.post(ADMIN_MOMENT_ADD_MOMENT, {
-        content,
-        images,
-      });
+  const handleSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setIsSubmitting(true);
+      try {
+        const response = await HttpService.post(ADMIN_MOMENT_ADD_MOMENT, {
+          content,
+          images,
+        });
 
-      if (response.status === 200) {
-        router.push("/moments");
+        if (response.status === 200) {
+          router.push("/moments");
+        }
+      } catch (error) {
+        console.error("发布说说失败:", error);
+      } finally {
+        setIsSubmitting(false);
       }
-    } catch (error) {
-      console.error("发布说说失败:", error);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
+    };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">

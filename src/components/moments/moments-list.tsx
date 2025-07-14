@@ -1,6 +1,5 @@
 "use client"
-
-import { useState } from "react"
+import { useState,useEffect } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -22,59 +21,75 @@ import Image from "next/image"
 import Link from "next/link"
 import { useContext } from "react";
 import { AdminContext } from "@/app/layout";
+import { MomentListProps } from '@/types/components-interface';
+import { MomentLike,Moment } from '@/types/service-interface';
+import { formatDate } from '@/lib/utils';
+import HttpService from "@/lib/axios-utils"
+import { MOMENT_LIKE_OR_DISLIKE } from "@/constant/request-url"
+import { getToken } from "@/lib/token-utils"
+import {jwtDecode} from 'jwt-decode';
+import { DecodedToken } from '@/types/service-interface';
+import CustomToast from '@/components/commen/custom-toast'
+import { on } from "events"
 
-// 模拟说说数据 (扩展到更多数据用于分页测试)
-const allMoments = Array.from({ length: 25 }, (_, i) => ({
-  id: i + 1,
-  content: `这是第 ${i + 1} 条说说。${i % 3 === 0 ? "今天天气真好，出去拍了一些照片。生活中总有那么多美好的瞬间值得记录。" : i % 3 === 1 ? "刚完成了一个新项目，感觉很有成就感！技术栈用的是Next.js + TypeScript，开发体验真的很棒。" : "周末去了一趟郊外，空气清新，心情也跟着好了起来。"}`,
-  images:
-    i % 4 === 0
-      ? [
-          `/placeholder.svg?height=300&width=400&text=说说图片${i + 1}-1`,
-          `/placeholder.svg?height=300&width=400&text=说说图片${i + 1}-2`,
-        ]
-      : i % 4 === 1
-        ? [`/placeholder.svg?height=300&width=400&text=说说图片${i + 1}`]
-        : [],
-  timestamp: `2024-01-${String(Math.max(1, 30 - i)).padStart(2, "0")} ${String(Math.floor(Math.random() * 24)).padStart(2, "0")}:${String(Math.floor(Math.random() * 60)).padStart(2, "0")}`,
-  likes: Math.floor(Math.random() * 20) + 1,
-  comments: Math.floor(Math.random() * 10) + 1,
-}))
-
-const ITEMS_PER_PAGE = 10
-
-
-export function MomentsList() {
-  const [currentPage, setCurrentPage] = useState(1)
-  const [moments, setMoments] = useState(allMoments)
+export function MomentsList( props:MomentListProps) {
+  const {
+    userId,
+    moments,
+    currentPage,
+    setCurrentPage,
+    pageSize,
+    totalPages,
+    onCommentAdded,
+    onCommentDeleted,
+    onMomentLiked,
+    onMomentDeleted
+  } = props
   const isAdmin = useContext(AdminContext);
+  const [toastOpen, setToastOpen] = useState(false);
+  const [toastData, setToastData] = useState({
+      title: '',
+      description: '',
+      actionText: "确定",
+      onActionClick: undefined,
+      duration: 3000 // 默认持续时间为3秒
+    });
 
-  const totalPages = Math.ceil(moments.length / ITEMS_PER_PAGE)
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-  const currentMoments = moments.slice(startIndex, startIndex + ITEMS_PER_PAGE)
 
   const handleDeleteMoment = (momentId: number) => {
-    setMoments(moments.filter((moment) => moment.id !== momentId))
-    // 如果删除后当前页没有数据，回到上一页
-    const newTotalPages = Math.ceil((moments.length - 1) / ITEMS_PER_PAGE)
-    if (currentPage > newTotalPages && newTotalPages > 0) {
-      setCurrentPage(newTotalPages)
-    }
+    // setMoments(moments.filter((moment) => moment.id !== momentId))
+    // // 如果删除后当前页没有数据，回到上一页
+    // const newTotalPages = Math.ceil((moments.length - 1) / ITEMS_PER_PAGE)
+    // if (currentPage > newTotalPages && newTotalPages > 0) {
+    //   setCurrentPage(newTotalPages)
+    // }
   }
 
+
+  const handleLike = async (momentId: number) => {
+    const token = getToken();
+    if (!token) {
+      setToastOpen(false);
+      setToastData({ ...toastData, title: '系统提示', description: '请登录之后再点赞噢~' });
+      setToastOpen(true);
+      return;
+    }
+    const response = await HttpService.post(MOMENT_LIKE_OR_DISLIKE + "/" + momentId);
+    if (response) {
+      // 查找当前说说的点赞状态
+      onMomentLiked?.(response.data,momentId)
+    }
+  }
   return (
     <div className="space-y-6">
-      {currentMoments.map((moment) => (
+      {moments.map((moment) => (
         <Card key={moment.id}>
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback>小明</AvatarFallback>
-                </Avatar>
                 <div>
-                  <div className="font-medium">小明</div>
-                  <div className="text-xs text-muted-foreground">{moment.timestamp}</div>
+                  <div className="font-medium">{moment.nickName}</div>
+                  <div className="text-xs text-muted-foreground">{formatDate(moment.createTime)}</div>
                 </div>
               </div>
               {isAdmin && (
@@ -117,7 +132,7 @@ export function MomentsList() {
               </p>
             </Link>
 
-            {moment.images.length > 0 && (
+            {moment.images?.length > 0 && (
               <Link href={`/moments/${moment.id}`} className="block">
                 <div
                   className={`grid gap-2 mb-4 ${
@@ -128,7 +143,7 @@ export function MomentsList() {
                         : "grid-cols-3"
                   }`}
                 >
-                  {moment.images.map((image, index) => (
+                  {moment.images.map((image: string, index: number) => (
                     <div key={index} className="relative overflow-hidden rounded-lg">
                       <Image
                         src={image || "/placeholder.svg"}
@@ -145,26 +160,30 @@ export function MomentsList() {
 
             <div className="flex items-center justify-between pt-3 border-t">
               <div className="flex items-center gap-6">
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Heart className="h-4 w-4" />
-                  {moment.likes}
+                <Button variant="ghost" size="sm" className={`gap-2 ${moment.likes.some(like => like.userId === userId) ? "text-red-500" : ""}`} onClick={() => handleLike(moment.id)}>
+                  <Heart className={`h-4 w-4 ${moment.likes.some(like => like.userId === userId) ? "fill-current" : ""}`} />
+                  {moment.likes == null ? 0 : moment.likes.length}
                 </Button>
                 <Link href={`/moments/${moment.id}`}>
                   <Button variant="ghost" size="sm" className="gap-2">
                     <MessageCircle className="h-4 w-4" />
-                    {moment.comments}
+                    {moment.comments == null ? 0 : moment.comments.length}
                   </Button>
                 </Link>
-                <Button variant="ghost" size="sm" className="gap-2">
-                  <Share className="h-4 w-4" />
-                  分享
-                </Button>
               </div>
             </div>
           </CardContent>
         </Card>
       ))}
-
+      <CustomToast
+        title={toastData.title}
+        description={toastData.description}
+        actionText={toastData.actionText}
+        onActionClick={toastData.onActionClick}
+        duration={toastData.duration}
+        open={toastOpen}
+        setOpen={setToastOpen}
+      />
       {/* 分页组件 */}
       {totalPages > 1 && <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />}
     </div>

@@ -19,5 +19,6 @@ export const ADMIN_DELETE_GUESTCOMMENT = "/admin/guestComment/deleteGuestComment
 export const ADMIN_MOMENT_ADD_MOMENT = "admin/moment/addMoment"
 export const ADMIN_MOMENT_DELETE_MOMENT = "admin/moment/deleteMoment"
 
-export const MOMENT_GET_MOMENT = "/moment/getMoment"
+export const MOMENT_GET_MOMENT_DETAILS = "/moment/getMomentDetails"
 export const MOMENT_GET_MOMENTS = "/moment/getMoments"
+export const MOMENT_LIKE_OR_DISLIKE = "/moment/likeOrDislike"

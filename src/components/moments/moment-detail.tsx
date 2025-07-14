@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState,useContext, use, useEffect } from "react"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -21,44 +21,65 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import Image from "next/image"
-
-interface Comment {
-  id: number
-  author: string
-  content: string
-  timestamp: string
-}
-
-interface Moment {
-  id: number
-  content: string
-  images: string[]
-  timestamp: string
-  likes: number
-  comments: Comment[]
-}
-
-interface MomentDetailProps {
-  moment: Moment
-}
-
+import { Moment, MomentComment } from "@/types/service-interface"
+import { MomentDetailProps } from "@/types/components-interface"
+import { AdminContext } from "@/app/layout";
+import HttpService from "@/lib/axios-utils"
+import { MOMENT_LIKE_OR_DISLIKE } from "@/constant/request-url"
+import { getToken } from "@/lib/token-utils"
+import {jwtDecode} from 'jwt-decode';
+import { DecodedToken } from '@/types/service-interface';
+import CustomToast from '@/components/commen/custom-toast'
+import { formatDate } from "@/lib/utils"
 export function MomentDetail({ moment }: MomentDetailProps) {
+
+  
   const [comments, setComments] = useState(moment.comments)
   const [newComment, setNewComment] = useState("")
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [likes, setLikes] = useState(moment.likes)
   const [isLiked, setIsLiked] = useState(false)
+  const isAdmin =  useContext(AdminContext)
+  const [toastData, setToastData] = useState({
+      title: '',
+      description: '',
+      actionText: "确定",
+      onActionClick: undefined,
+      duration: 3000 // 默认持续时间为3秒
+    });
+  const [toastOpen, setToastOpen] = useState(false);
 
-  // 模拟管理员状态
-  const isAdmin = true
 
-  const handleLike = () => {
-    if (isLiked) {
-      setLikes(likes - 1)
-      setIsLiked(false)
-    } else {
-      setLikes(likes + 1)
-      setIsLiked(true)
+  useEffect(() => {
+    const token = getToken();
+    if (!token) {
+      return; // 如果没有token，直接返回
+    }
+    const decoded = jwtDecode<DecodedToken>(token); // 直接获取Payload对象[3](@ref)
+    const userId = decoded?.userId;
+    setIsLiked(moment.likes.some(like => like.userId === userId));
+  },[getToken()]);
+
+  const handleLike = async () => {
+    const token = getToken();
+    if (!token) {
+       setToastOpen(false);
+      setToastData({...toastData, title: '系统提示', description: '请登录之后再点赞噢~'});
+      setToastOpen(true);
+      return;
+    }
+    const decoded = jwtDecode<DecodedToken>(token);
+    const userId = decoded.userId;
+    const response = await HttpService.post(MOMENT_LIKE_OR_DISLIKE+"/"+moment.id);
+    if (response) {
+      const newLike = response.data
+      if (isLiked) {
+        setLikes(likes.filter(like => like.userId !== userId))
+        setIsLiked(false)
+      } else {
+        setLikes([...likes,newLike])
+        setIsLiked(true)
+      }
     }
   }
 
@@ -69,21 +90,21 @@ export function MomentDetail({ moment }: MomentDetailProps) {
     setIsSubmitting(true)
 
     // 模拟提交评论
-    setTimeout(() => {
-      const comment: Comment = {
-        id: comments.length + 1,
-        author: "当前用户",
-        content: newComment,
-        timestamp: new Date().toLocaleString("zh-CN"),
-      }
-      setComments([...comments, comment])
-      setNewComment("")
-      setIsSubmitting(false)
-    }, 500)
+    //   const comment: Comment = {
+    //     id: comments.length + 1,
+    //     author: "当前用户",
+    //     content: newComment,
+    //     timestamp: new Date().toLocaleString("zh-CN"),
+    //   }
+    //   setComments([...comments, comment])
+    //   setNewComment("")
+    //   setIsSubmitting(false)
   }
 
-  const handleDeleteComment = (commentId: number) => {
+  const handleDeleteComment = (commentId: number) => { 
+
     setComments(comments.filter((comment) => comment.id !== commentId))
+    
   }
 
   const handleDeleteMoment = () => {
@@ -99,12 +120,9 @@ export function MomentDetail({ moment }: MomentDetailProps) {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Avatar>
-                <AvatarFallback>小明</AvatarFallback>
-              </Avatar>
               <div>
-                <div className="font-medium">小明</div>
-                <div className="text-xs text-muted-foreground">{moment.timestamp}</div>
+                <div className="font-medium">{moment.nickName}</div>
+                <div className="text-xs text-muted-foreground">{formatDate(moment.createTime)}</div>
               </div>
             </div>
             {isAdmin && (
@@ -143,7 +161,7 @@ export function MomentDetail({ moment }: MomentDetailProps) {
         <CardContent className="pt-0">
           <p className="mb-4 leading-relaxed text-lg">{moment.content}</p>
 
-          {moment.images.length > 0 && (
+          {moment?.images?.length > 0 && (
             <div
               className={`grid gap-2 mb-4 ${
                 moment.images.length === 1 ? "grid-cols-1" : moment.images.length === 2 ? "grid-cols-2" : "grid-cols-3"
@@ -172,15 +190,11 @@ export function MomentDetail({ moment }: MomentDetailProps) {
                 onClick={handleLike}
               >
                 <Heart className={`h-4 w-4 ${isLiked ? "fill-current" : ""}`} />
-                {likes}
+                {likes?.length}
               </Button>
               <Button variant="ghost" size="sm" className="gap-2">
                 <MessageCircle className="h-4 w-4" />
-                {comments.length}
-              </Button>
-              <Button variant="ghost" size="sm" className="gap-2">
-                <Share className="h-4 w-4" />
-                分享
+                {comments?.length}
               </Button>
             </div>
           </div>
@@ -190,7 +204,7 @@ export function MomentDetail({ moment }: MomentDetailProps) {
       {/* 评论区 */}
       <Card>
         <CardHeader>
-          <h3 className="text-lg font-semibold">评论 ({comments.length})</h3>
+          <h3 className="text-lg font-semibold">评论 ({comments?.length})</h3>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* 发表评论 */}
@@ -210,16 +224,16 @@ export function MomentDetail({ moment }: MomentDetailProps) {
 
           {/* 评论列表 */}
           <div className="space-y-4">
-            {comments.map((comment) => (
+            {comments?.map((comment) => (
               <div key={comment.id} className="flex gap-3 p-3 bg-muted/30 rounded-lg">
                 <Avatar className="h-8 w-8">
-                  <AvatarFallback className="text-xs">{comment.author[0]}</AvatarFallback>
+                  <AvatarFallback className="text-xs">{comment.nickName}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-sm">{comment.author}</span>
-                      <span className="text-xs text-muted-foreground">{comment.timestamp}</span>
+                      <span className="font-medium text-sm">{comment.nickName}</span>
+                      <span className="text-xs text-muted-foreground">{comment.createTime}</span>
                     </div>
                     {isAdmin && (
                       <AlertDialog>
@@ -248,6 +262,16 @@ export function MomentDetail({ moment }: MomentDetailProps) {
           </div>
         </CardContent>
       </Card>
+
+      <CustomToast
+        title={toastData.title}
+        description={toastData.description}
+        actionText={toastData.actionText}
+        onActionClick={toastData.onActionClick}
+        duration={toastData.duration}
+        open={toastOpen}
+        setOpen={setToastOpen}
+      />
     </div>
   )
 }

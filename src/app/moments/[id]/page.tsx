@@ -1,6 +1,10 @@
+"use client"
+import { useEffect,useState,use } from "react"
 import { MomentDetail } from "@/components/moments/moment-detail"
 import { ArrowLeft } from "lucide-react"
 import Link from "next/link"
+import HttpService from "@/lib/axios-utils"
+import { MOMENT_GET_MOMENT_DETAILS } from "@/constant/request-url"
 
 // 模拟说说详情数据
 const momentsData = {
@@ -57,9 +61,31 @@ const momentsData = {
   },
 }
 
-export default function MomentDetailPage({ params }: { params: { id: string } }) {
-  const momentId = Number.parseInt(params.id)
-  const moment = momentsData[momentId as keyof typeof momentsData]
+export default function MomentDetailPage({ params }: { params: Promise<{ id: string }>  }) {
+  const [moment, setMoment] = useState(null)
+  const [isLoading, setIsLoading] = useState(true)
+  // 使用React.use()解包params
+  const { id } = use(params)
+
+  useEffect(() => {
+      const fetchMoment = async () => {
+        try {
+          const momentId = Number.parseInt(id) // 在useEffect内部获取params.id
+          const response = await HttpService.get(`${MOMENT_GET_MOMENT_DETAILS}/${momentId}`, {})
+          setMoment(response.data)
+        } catch (error) {
+          console.error('Failed to fetch moment:', error)
+        } finally {
+          setIsLoading(false)
+        }
+      }
+
+      fetchMoment()
+    }, [id]) // 依赖项改为params.id
+
+  if (isLoading) {
+    return <div className="container py-12 md:py-16 lg:py-24 text-center">加载中...</div>
+  }
 
   if (!moment) {
     return (
@@ -82,7 +108,6 @@ export default function MomentDetailPage({ params }: { params: { id: string } })
         <ArrowLeft className="mr-2 h-4 w-4" />
         返回说说列表
       </Link>
-
       <MomentDetail moment={moment} />
     </div>
   )

@@ -29,7 +29,18 @@ import { getToken } from '@/lib/token-utils';
 import { ADMIN_DELETE_GUESTBOOK, ADMIN_DELETE_GUESTCOMMENT, GUESTCOMMENT_ADDCOMMENT, USER_GETISADMIN } from '@/constant/request-url';
 import { AdminContext } from "@/app/layout";
 import { useContext } from "react";
-export function GuestbookEntries({entries = [], currentPage = 1,totalPages, setCurrentPage, pageSize = 10, onCommentAdded,onCommentDelete ,onGuestBookEntryDelete}: GuestbookEntiresProps) {
+import { formatDate } from '@/lib/utils';
+export function GuestbookEntries(props: GuestbookEntiresProps) {
+  const {
+    entries = [], 
+    currentPage = 1,
+    totalPages, 
+    setCurrentPage, 
+    pageSize = 10, 
+    onCommentAdded,
+    onCommentDelete,
+    onGuestBookEntryDelete
+  } = props;
   const [expandedEntries, setExpandedEntries] = useState<Set<number>>(new Set())
   const [replyTexts, setReplyTexts] = useState<Record<number, string>>({})
 
@@ -45,20 +56,6 @@ export function GuestbookEntries({entries = [], currentPage = 1,totalPages, setC
       duration: 3000 // 默认持续时间为3秒
     });
   const [toastOpen, setToastOpen] = useState(false);
-
-  // useEffect(() => {
-  //   console.log("获取管理员状态",getToken());
-  //   if (!getToken()) {
-  //     setIsAdmin(false);
-  //     return;
-  //   }
-
-  //   HttpService.get(USER_GETISADMIN)
-  //     .then((response) => {
-  //       const userIsAdmin = response.data;
-  //       setIsAdmin(userIsAdmin);
-  //     })
-  // }, [getToken()]); // 当 token 改变时重新执行
 
   const handleDeleteEntry = (entryId: number) => {
     if (!isAdmin) return;
@@ -130,12 +127,6 @@ export function GuestbookEntries({entries = [], currentPage = 1,totalPages, setC
     }
     setExpandedEntries(newExpanded)
   }
-
-
-  const formatDate = (date: Array<string>): string => {
-    const [YYYY, MM, DD, HH, MM2] = date;
-    return `${YYYY}-${MM}-${DD} ${HH}:${MM2}`;
-  };
 
   return (
     <div className="space-y-4">
