@@ -88,6 +88,7 @@ export default function GuestbookPage() {
       });
       setEntries(response.data.guestBooks);
       setTotalPages(Math.ceil(response.data.totalEntries / pageSize));
+      console.log(response.data.guestBooks);
     };
 
     fetchEntries();
